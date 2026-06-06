@@ -1,0 +1,31 @@
+- name: Install ufw
+  ansible.builtin.apt:
+    name: ufw
+    state: present
+    update_cache: true
+
+- name: UFW - Set default deny policy
+  community.general.ufw:
+    state: enabled
+    policy: deny
+    direction: incoming
+
+- name: UFW - Allow SSH connections
+  community.general.ufw:
+    rule: allow
+    name: OpenSSH
+
+- name: UFW - Allow Wireguard connections
+  community.general.ufw:
+    rule: allow
+    port: "51820"
+    proto: udp
+
+- name: UFW - Allow HTTP/HTTPS (Caddy)
+  community.general.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop:
+    - "80"
+    - "443"

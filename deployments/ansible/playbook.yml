@@ -1,0 +1,6 @@
+- name: Déploiement complet du Serveur HomeLab
+  hosts: web
+  become: true
+  roles:
+    - ufw
+    - docker-deploy

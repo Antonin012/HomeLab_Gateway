@@ -1,0 +1,24 @@
+services:
+  caddy:
+    image: caddy:latest
+    container_name: caddy-proxy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      vpn_net:
+        ipv4_address: 10.0.0.10
+
+volumes:
+  caddy_data:
+  caddy_config:
+
+networks:
+  vpn_net:
+    external: true
+    name: vpn_net

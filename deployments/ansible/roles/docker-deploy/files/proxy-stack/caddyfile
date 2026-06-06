@@ -1,0 +1,17 @@
+# Grafana
+grafana.vpn {
+    tls internal
+    reverse_proxy 10.0.0.30:3000
+}
+
+# Pi-hole
+pihole.vpn {
+    tls internal
+    reverse_proxy 10.0.0.53:80
+}
+
+# Prometheus
+prometheus.vpn {
+    tls internal
+    reverse_proxy 10.0.0.90:9090
+}

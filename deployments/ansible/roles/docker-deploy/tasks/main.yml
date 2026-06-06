@@ -1,0 +1,101 @@
+- name: Install dependencies
+  ansible.builtin.apt:
+    name:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - gnupg
+      - lsb-release
+      - python3-docker
+    state: present
+    update_cache: true
+
+- name: Create directory for Docker keyrings
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: '0755'
+
+- name: Add Docker GPG key
+  ansible.builtin.get_url:
+    url: https://download.docker.com/linux/debian/gpg
+    dest: /etc/apt/keyrings/docker.asc
+    mode: '0644'
+
+- name: Add Docker APT repository
+  ansible.builtin.apt_repository:
+    repo: "deb [arch={{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' if ansible_architecture == 'aarch64' else 'armhf' }} signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian {{ ansible_distribution_release }} stable"
+    state: present
+
+- name: Install Docker Engine and Compose plugin
+  ansible.builtin.apt:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-compose-plugin
+    state: present
+    update_cache: true
+
+- name: Create Docker network vpn_net
+  community.docker.docker_network:
+    name: vpn_net
+    ipam_config:
+      - subnet: 10.0.0.0/24
+
+# Def variable
+- name: Définir le chemin racine du projet
+  ansible.builtin.set_fact:
+    project_path: "/opt/homelab"
+
+- name: Création des dossiers pour les stacks Docker
+  ansible.builtin.file:
+    path: "{{ project_path }}/{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - vpn-stack
+    - monitoring
+    - proxy-stack
+
+- name: Génération du fichier .env global
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ project_path }}/.env"
+    mode: '0600'
+
+- name: Copie des fichiers de la stack VPN
+  ansible.builtin.copy:
+    src: vpn-stack/docker-compose.yml
+    dest: "{{ project_path }}/vpn-stack/docker-compose.yml"
+
+- name: Copie des fichiers de la stack Monitoring
+  ansible.builtin.copy:
+    src: "monitoring/{{ item }}"
+    dest: "{{ project_path }}/monitoring/{{ item }}"
+  loop:
+    - docker-compose.yml
+    - prometheus.yml
+
+- name: Copie des fichiers de la stack Proxy
+  ansible.builtin.copy:
+    src: "proxy-stack/{{ item }}"
+    dest: "{{ project_path }}/proxy-stack/{{ item }}"
+  loop:
+    - docker-compose.yml
+    - caddyfile
+
+- name: Deploy VPN stack docker compose
+  community.docker.docker_compose_v2:
+    project_src: "{{ project_path }}/vpn-stack/"
+    state: present
+
+- name: Deploy monitoring docker compose
+  community.docker.docker_compose_v2:
+    project_src: "{{ project_path }}/monitoring/"
+    state: present
+
+- name: Deploy proxy-stack docker compose
+  community.docker.docker_compose_v2:
+    project_src: "{{ project_path }}/proxy-stack/"
+    state: present
