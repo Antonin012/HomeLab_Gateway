@@ -1,0 +1,15 @@
+- name: Set up fail2ban metrics for Prometheus (optional)
+  ansible.builtin.copy:
+    dest: /usr/local/bin/fail2ban-metrics
+    content: |
+      #!/bin/bash
+      # Export fail2ban metrics in Prometheus format
+      for jail in $(fail2ban-client status | grep 'Jail list' | sed 's/.*://;s/,//g'); do
+        banned=$(fail2ban-client status "$jail" | grep 'Currently banned' | awk '{print $NF}')
+        total=$(fail2ban-client status "$jail" | grep 'Total banned' | awk '{print $NF}')
+        echo "fail2ban_banned_current{jail=\"$jail\"} $banned"
+        echo "fail2ban_banned_total{jail=\"$jail\"} $total"
+      done
+    owner: root
+    group: root
+    mode: '0755'

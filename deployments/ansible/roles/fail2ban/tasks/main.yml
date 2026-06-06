@@ -1,0 +1,62 @@
+- name: Install fail2ban
+  ansible.builtin.package:
+    name: fail2ban
+    state: "{{ fail2ban_package_state }}"
+  notify: Enable fail2ban
+
+- name: Create fail2ban local configuration directory
+  ansible.builtin.file:
+    path: /etc/fail2ban/jail.d
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Create filter.d directory for custom filters
+  ansible.builtin.file:
+    path: /etc/fail2ban/filter.d
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Deploy fail2ban default settings
+  ansible.builtin.template:
+    src: jail.local.j2
+    dest: /etc/fail2ban/jail.local
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart fail2ban
+
+- name: Deploy individual jail configurations
+  ansible.builtin.template:
+    src: jail.conf.j2
+    dest: "/etc/fail2ban/jail.d/{{ item.name }}.conf"
+    owner: root
+    group: root
+    mode: '0644'
+  loop: "{{ fail2ban_jails }}"
+  when: fail2ban_jails | length > 0
+  notify: Restart fail2ban
+
+- name: Deploy custom filter definitions
+  ansible.builtin.copy:
+    dest: "/etc/fail2ban/filter.d/{{ item.name }}.conf"
+    content: "{{ item.definition }}"
+    owner: root
+    group: root
+    mode: '0644'
+  loop: "{{ fail2ban_custom_filters }}"
+  when: fail2ban_custom_filters | length > 0
+  notify: Restart fail2ban
+
+- name: Include monitoring tasks
+  ansible.builtin.import_tasks: monitoring.yml
+  when: fail2ban_enable_monitoring | default(false)
+
+- name: Start and enable fail2ban
+  ansible.builtin.service:
+    name: fail2ban
+    state: started
+    enabled: yes

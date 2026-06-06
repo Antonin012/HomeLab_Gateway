@@ -33,6 +33,16 @@ services:
         ipv4_address: 10.0.0.91
     restart: unless-stopped
 
+  fail2ban-exporter:
+    image: registry.gitlab.com/hectorjsmith/fail2ban-prometheus-exporter:latest
+    container_name: fail2ban-exporter
+    volumes:
+      - /var/run/fail2ban/fail2ban.sock:/var/run/fail2ban/fail2ban.sock:ro
+    networks:
+      vpn_net:
+        ipv4_address: 10.0.0.92
+    restart: unless-stopped
+
 volumes:
   grafana-storage:
 

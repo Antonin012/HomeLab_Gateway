@@ -1,0 +1,4 @@
+fail2ban_package_state: present
+fail2ban_jails: []
+fail2ban_custom_filters: []
+fail2ban_enable_monitoring: false

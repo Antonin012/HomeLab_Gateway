@@ -3,4 +3,5 @@
   become: true
   roles:
     - ufw
+    - fail2ban
     - docker-deploy
