@@ -1,66 +1,68 @@
-# Secure DNS & VPN Gateway
+# Homelab Gateway
 
 ![Statut](https://img.shields.io/badge/Statut-Actif-success)
-![Sécurité](https://img.shields.io/badge/Sécurité-Renforcée-blue)
+![Sécurité](https://img.shields.io/badge/Sécurité-Ansible--Vault-blue)
 ![OS](https://img.shields.io/badge/OS-Debian%2012-BD2A2E?logo=debian)
-![Docker](https://img.shields.io/badge/Docker-27.5-13678A?logo=docker)
-![WireGuard](https://img.shields.io/badge/WireGuard-v1.0-881717?logo=wireguard)
-![Pi-Hole](https://img.shields.io/badge/Pi_Hole-2025.02-89679C?logo=Pi-Hole)
+![Docker](https://img.shields.io/badge/Docker-Enabled-13678A?logo=docker)
 
-## Présentation du Projet
+Une passerelle d'accès à distance sécurisée et automatisée pour Home Lab, combinant un tunnel VPN chiffré, un filtrage DNS (Sinkhole) et un Reverse Proxy moderne.
 
-Ce projet documente la mise en place d'une passerelle d'accès à distance sécurisée (Secure Remote Access Gateway) pour un Home Lab. L'objectif principal est de permettre un accès chiffré et sécurisé aux services hébergés localement (Nextcloud, Lab de Pentest, etc.) depuis l'extérieur, sans jamais exposer ces services directement sur l'Internet public.
+## Présentation
 
-## Prérequis
+Ce projet permet de déployer une passerelle (Gateway) robuste pour accéder à vos services locaux (Nextcloud, serveurs de fichiers, labs de test) depuis n'importe où, sans jamais les exposer directement sur l'Internet public. 
 
-Avant de commencer, assurez-vous de disposer des éléments suivants :
-- Un serveur sous **Debian 12** (ou autre distribution Linux stable).
-- **Docker** et **Docker Compose** installés.
-- Un accès à l'interface de votre routeur pour rediriger le port **UDP 51820**.
-- Une IP publique statique ou un service de DNS dynamique (DDNS).
+L'infrastructure est entièrement pilotée par **Ansible** pour garantir un déploiement reproductible et sécurisé (Infrastructure as Code).
 
-## Architecture et Fonctionnement
+## Architecture
 
-Le système est conçu autour du principe du moindre privilège et d'une politique de sécurité "Default Deny". 
+![Diagramme de l'Architecture](./docs/res/DiagrammeVPN.png)
 
-![Diagramme de l'Architecture](./Doc/res/DiagrammeVPN.png)
+> **Segmentation de Sécurité (Zones & Interfaces) :**
+> - **Zone WAN (DMZ Logicielle) - `eth0`** : Point d'entrée physique. Seul le port UDP/51820 est exposé. Tout trafic non authentifié est rejeté par défaut.
+> - **Zone VPN (Tunnel de Confiance) - `wg0`** : Interface virtuelle de déchiffrement. Une fois le tunnel établi, le trafic est considéré comme "Trusted".
+> - **Zone Services (Microservices) - `docker0 / vpn_net`** : Réseau isolé pour les conteneurs (Pi-hole, Caddy, Grafana). Communication inter-conteneurs sans exposition sur l'hôte.
+> - **Zone LAN (HomeLab Physique) - `eth1`** : Interface dédiée aux ressources locales physiques (NAS, serveurs de test). Isolation totale du réseau domestique standard.
 
-## Durcissement du Système Hôte (Hardening)
+Le système repose sur quatre piliers fondamentaux :
+1.  **WireGuard (VPN)** : Le tunnel chiffré haute performance pour l'accès entrant.
+2.  **Pi-hole (DNS)** : Filtrage des publicités et des traqueurs pour tous les clients VPN.
+3.  **Caddy (Reverse Proxy)** : Routage interne des services avec HTTPS automatique.
+4.  **UFW & Fail2Ban** : Protection périmétrale et blocage des intrusions.
 
-Pour garantir la sécurité de la passerelle, les mesures suivantes sont appliquées sur le serveur Debian :
-- **Pare-feu (UFW)** : Politique par défaut à `deny`. Seuls les ports VPN et SSH (port personnalisé) sont ouverts.
-- **Fail2Ban** : Protection contre le brute-force avec bannissement automatique des IPs suspectes.
-- **Sécurisation SSH** : Désactivation de l'authentification par mot de passe, utilisation de clés Ed25519 uniquement, et changement du port par défaut.
-- **Mises à jour automatiques** : Installation du paquet `unattended-upgrades` pour garantir que les patchs de sécurité sont appliqués quotidiennement.
+### Pourquoi Caddy plutôt qu'Nginx ?
+Pour ce projet, le choix s'est porté sur **Caddy** pour plusieurs raisons :
+*   **Simplicité de configuration** : Le `Caddyfile` est beaucoup plus lisible et rapide à configurer que les fichiers `.conf` d'Nginx.
+*   **HTTPS Natif** : Caddy gère les certificats SSL automatiquement.
+*   **Curiosité Technique** : Ayant déjà utilisé Nginx sur de nombreux projets précédents, l'objectif était de découvrir et d'éprouver un outil moderne et performant.
 
-### Composants Clés :
-- **Ingress Routeur** : Redirige uniquement le trafic UDP nécessaire vers la Gateway Debian.
-- **WireGuard (via Pi-VPN)** : Fournit le tunnel VPN chiffré, sélectionné pour sa légèreté, ses performances (intégré au noyau Linux) et sa discrétion (ne répond pas aux paquets non authentifiés - Stealth mode).
-- **UFW (Pare-Feu)** : Applique une politique stricte de blocage par défaut, n'autorise que le port d'écoute du VPN.
-- **Fail2Ban** : Protège contre les attaques par force brute (notamment sur le SSH) et bannit automatiquement les comportements suspects.
-- **Hardening Système** : Sécurisation du service SSH via l'utilisation exclusive de clés cryptographiques Asymétriques (Ed25519) et le changement du port par défaut.
+## Déploiement Rapide
 
-## Guide d'Installation et de Déploiement
+### Prérequis
+*   Un serveur sous **Debian 12**.
+*   Accès SSH avec clé publique.
+*   Ansible installé sur votre machine de contrôle.
 
-Toutes les étapes détaillées pour reproduire cette infrastructure de sécurité, depuis la préparation du serveur Debian jusqu'aux tests de validation (Nmap, DNS leak), sont disponibles dans le document d'installation dédié :
- 
-**[Consulter le Guide d'Installation complet](./Doc/Install.md)**
+### Installation
+1.  **Cloner le dépôt** :
+    ```bash
+    git clone https://github.com/Antonin012/homelab-gateway.git
+    cd homelab-gateway
+    ```
+2.  **Configurer les variables** :
+    Éditez `deployments/ansible/inventory.ini` avec l'IP de votre serveur.
+3.  **Sécuriser les secrets** :
+    ```bash
+    ansible-vault encrypt deployments/ansible/group_vars/all/secrets.yml
+    ```
+4.  **Lancer le déploiement** :
+    ```bash
+    ansible-playbook -i deployments/ansible/inventory.ini deployments/ansible/playbook.yml --ask-vault-pass
+    ```
 
-### Résumé des Étapes :
-1. Mise à jour de la distribution (Debian 12 - Bookworm).
-2. Déploiement de WireGuard (Pi-VPN).
-3. Configuration du routage réseau (IP Forwarding).
-4. Mise en place du pare-feu (UFW) et de la protection active (Fail2Ban).
-5. Sécurisation du SSH et gestion des accès clients distants.
-6. Phase d'audits et de tests.
+## Documentation Détaillée
 
-## Évolutions et Sécurité Avancée
+Pour plus de détails sur la configuration, les tests de sécurité et l'utilisation quotidienne, consultez notre guide complet :
+ **[Guide d'Installation et d'Utilisation](./docs/install.md)**
 
-J'ai décider d'ajouter un **DNS Sinkhole (Pi-Hole)** pour limiter l'affichage de pubs sur internet et limiter les traqueurs au niveau réseau
-
-## Sécurité et Validation
-
-L'infrastructure a été validée par plusieurs tests pour s'assurer de sa robustesse :
-- **Audit externe (Nmap)** : Prouvant l'invisibilité des ports et des services depuis l'extérieur.
-- **Tests de connectivité** : Confirmant l'accès fluide et exclusif aux ressources locales une fois le tunnel établi.
-- **DNS Leak Tests** : Garantissant qu'aucune requête DNS n'est divulguée en dehors du tunnel chiffré.
+---
+*Projet réalisé dans un objectif de sécurisation réseau et d'apprentissage des outils DevOps.*
